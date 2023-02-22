@@ -119,8 +119,10 @@ contract CounterFactsTest is BaseTest {
         address dataContract
     ) internal pure returns (string memory) {
         if (bytes(data).length > 0) {
-            data =
-                LibString.concat("data:text/plain,", LibString.escapeJSON(data));
+            data = LibString.concat(
+                "data:text/plain,",
+                LibString.escapeJSON(LibString.escapeHTML(data))
+            );
         } else {
             data = LibString.concat(
                 "data:text/plain,",

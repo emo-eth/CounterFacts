@@ -5,7 +5,8 @@ libs = ['lib']
 bytecode_hash = 'none'
 remappings = [
     'solmate/=lib/solmate/src/',
-    'solady/=lib/solady/src/'
+    'solady/=lib/solady/src/',
+    'create2-scripts/=lib/create2-helpers/script/',
 ]
 
 [rpc_endpoints]

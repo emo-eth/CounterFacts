@@ -3,26 +3,27 @@ pragma solidity ^0.8.17;
 
 import { Script, console2 } from "forge-std/Script.sol";
 import { CounterFacts } from "../src/CounterFacts.sol";
-import { BaseCreate2Script } from "create2-scripts/BaseCreate2Script.s.sol";
 
-contract Deploy is BaseCreate2Script {
+contract Mint is Script {
     function run() public {
         uint256 key = vm.envUint("DEPLOYER_KEY");
 
-        deployer = vm.rememberKey(key);
+        address deployer = vm.rememberKey(key);
+        CounterFacts counterFacts = CounterFacts(vm.envAddress("COUNTERFACTS"));
 
         string[] memory networks = vm.envString("NETWORKS", ",");
         for (uint256 i; i < networks.length; i++) {
             string memory network = networks[i];
             vm.createSelectFork(getChain(network).rpcUrl);
-            address facts = _immutableCreate2IfNotDeployed(
-                deployer, bytes32(0), type(CounterFacts).creationCode
-            );
-            CounterFacts counterFacts = CounterFacts(facts);
-            address prediction =
-                counterFacts.predict('hello "world"', bytes32(0));
+            string memory data =
+                '<svg width="100" height="50"><text x="10" y="30" font-size="20">Hello World</text></svg>';
+            address prediction = counterFacts.predict(data, bytes32(0));
             vm.broadcast(deployer);
-            counterFacts.mint(prediction);
+            uint256 tokenId = counterFacts.mint(prediction);
+            vm.broadcast(deployer);
+            counterFacts.reveal(tokenId, data, bytes32(0));
+
+            address facts = address(counterFacts);
             console2.log("Deployed CounterFacts to", facts);
         }
     }
