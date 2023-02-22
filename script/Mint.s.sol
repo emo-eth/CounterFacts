@@ -6,7 +6,7 @@ import { CounterFacts } from "../src/CounterFacts.sol";
 
 contract Mint is Script {
     function run() public {
-        uint256 key = vm.envUint("DEPLOYER_KEY");
+        uint256 key = vm.envUint("DEPLOYER_PRIVATE_KEY");
 
         address deployer = vm.rememberKey(key);
         CounterFacts counterFacts = CounterFacts(vm.envAddress("COUNTERFACTS"));

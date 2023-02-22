@@ -139,4 +139,19 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
             '"}]}'
         );
     }
+
+    function contractURI() public pure returns (string memory) {
+        return string.concat(
+            "data:application/json;base64,",
+            Base64.encode(
+                bytes(
+                    string.concat(
+                        unicode'{"name":"CounterFacts™","description":"Counterfacts™: the fun, collectible way to prove ',
+                        unicode"you're right!",
+                        '"}'
+                    )
+                )
+            )
+        );
+    }
 }
