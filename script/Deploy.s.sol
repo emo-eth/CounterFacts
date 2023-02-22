@@ -15,7 +15,12 @@ contract Deploy is Script {
             string memory network = networks[i];
             vm.createSelectFork(getChain(network).rpcUrl);
             vm.broadcast(deployer);
-            address facts = address(new CounterFacts());
+            CounterFacts counterFacts = new CounterFacts();
+            address prediction =
+                counterFacts.predict('hello "world"', bytes32(0));
+            vm.broadcast(deployer);
+            counterFacts.mint(prediction);
+            address facts = address(counterFacts);
             console2.log("Deployed CounterFacts to", facts);
         }
     }

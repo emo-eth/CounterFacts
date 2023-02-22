@@ -121,6 +121,11 @@ contract CounterFactsTest is BaseTest {
         if (bytes(data).length > 0) {
             data =
                 LibString.concat("data:text/plain,", LibString.escapeJSON(data));
+        } else {
+            data = LibString.concat(
+                "data:text/plain,",
+                "This CounterFact has not yet been revealed."
+            );
         }
         return string.concat(
             '{"animation_url":"',

@@ -90,14 +90,16 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
         if (_ownerOf[tokenId] == address(0)) {
             revert TokenDoesNotExist(tokenId);
         }
-        string memory jsonEscapedString = "";
+        string memory jsonEscapedString;
+
         address dataContract = dataContracts[tokenId];
         if (dataContract.code.length > 0) {
-            jsonEscapedString = string.concat(
-                "data:text/plain,",
-                LibString.escapeJSON(string(SSTORE2.read(dataContract)))
-            );
+            jsonEscapedString =
+                LibString.escapeJSON(string(SSTORE2.read(dataContract)));
+        } else {
+            jsonEscapedString = "This CounterFact has not yet been revealed.";
         }
+        jsonEscapedString = string.concat("data:text/plain,", jsonEscapedString);
         return string.concat(
             '{"animation_url":"',
             jsonEscapedString,
