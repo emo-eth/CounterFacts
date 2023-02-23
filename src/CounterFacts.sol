@@ -30,9 +30,15 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
 
     event MetadataUpdate(uint256 _tokenId);
 
+    struct DataContract {
+        address dataContract;
+        bool deployed;
+    }
+
     uint256 public nextTokenId;
     mapping(uint256 tokenId => address creator) public creators;
-    mapping(uint256 tokenId => address dataContract) public dataContracts;
+    mapping(uint256 tokenId => DataContract dataContract) internal
+        _dataContracts;
     mapping(address dataContract => uint256 tokenId) public
         dataContractToTokenId;
 
@@ -41,6 +47,9 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
      * of its contents (must currently be empty).
      */
     function mint(address dataContract) public returns (uint256 tokenId) {
+        // this can be inaccurate if called during the constructor of
+        // dataContract, so also store a boolean flag when actually deployed
+        // by reveal()
         if (dataContract.code.length > 0) {
             revert ContractExists();
         }
@@ -52,7 +61,8 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
         // store the creator
         creators[tokenId] = msg.sender;
         // store the counterfactual contract address
-        dataContracts[tokenId] = dataContract;
+        _dataContracts[tokenId] =
+            DataContract({ dataContract: dataContract, deployed: false });
         // store the tokenId in the reverse mapping
         dataContractToTokenId[dataContract] = tokenId;
         _mint(msg.sender, tokenId);
@@ -70,10 +80,12 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
             revert TokenDoesNotExist(tokenId);
         }
         address deployed = SSTORE2.writeDeterministic(bytes(data), salt);
+        DataContract memory dataContract = _dataContracts[tokenId];
         // check that the deployed address matches the counterfactual address
-        if (deployed != dataContracts[tokenId]) {
+        if (deployed != dataContract.dataContract) {
             revert IncorrectStorageAddress();
         }
+        _dataContracts[tokenId].deployed = true;
         // signal that the metadata has been updated
         emit MetadataUpdate(tokenId);
     }
@@ -118,13 +130,28 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
         }
         string memory escapedString;
 
-        address dataContract = dataContracts[tokenId];
+        DataContract memory dataContractStruct = _dataContracts[tokenId];
+        address dataContract = dataContractStruct.dataContract;
         if (dataContract.code.length > 0) {
-            // escape HTML to avoid embedding of non-text content
-            // escape JSON to avoid breaking the JSON
-            escapedString = LibString.escapeJSON(
-                LibString.escapeHTML(string(SSTORE2.read(dataContract)))
-            );
+            if (dataContractStruct.deployed) {
+                // escape HTML to avoid embedding of non-text content
+                // escape JSON to avoid breaking the JSON
+                escapedString = LibString.escapeJSON(
+                    LibString.escapeHTML(string(SSTORE2.read(dataContract)))
+                );
+            } else {
+                escapedString = "data:text/plain,Very sneaky!";
+                return string.concat(
+                    '{"animation_url":"',
+                    escapedString,
+                    '","attributes":[{"trait_type":"Creator","value":"',
+                    "The Sneakooooor",
+                    '"},{"trait_type":"Data Contract","value":"',
+                    LibString.toHexString(dataContract),
+                    '"}, {"trait_type":"Sneaky","value":"Yes',
+                    '"}]}'
+                );
+            }
         } else {
             escapedString = "This CounterFact has not yet been revealed.";
         }
@@ -138,6 +165,14 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
             LibString.toHexString(dataContract),
             '"}]}'
         );
+    }
+
+    function getDataContract(uint256 tokenId)
+        public
+        view
+        returns (DataContract memory dataContract)
+    {
+        return _dataContracts[tokenId];
     }
 
     function contractURI() public pure returns (string memory) {
