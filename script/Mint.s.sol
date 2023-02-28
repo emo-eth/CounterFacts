@@ -3,6 +3,7 @@ pragma solidity ^0.8.17;
 
 import { Script, console2 } from "forge-std/Script.sol";
 import { CounterFacts } from "../src/CounterFacts.sol";
+import { ConstructorMinter } from "../test/helpers/ConstructorMinter.sol";
 
 contract Mint is Script {
     function run() public {
@@ -25,6 +26,8 @@ contract Mint is Script {
 
             address facts = address(counterFacts);
             console2.log("Deployed CounterFacts to", facts);
+            vm.broadcast(deployer);
+            new ConstructorMinter(facts);
         }
     }
 }

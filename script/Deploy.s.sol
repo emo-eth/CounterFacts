@@ -13,7 +13,9 @@ contract Deploy is BaseCreate2Script {
             string memory network = networks[i];
             vm.createSelectFork(getChain(network).rpcUrl);
             address facts = _immutableCreate2IfNotDeployed(
-                deployer, bytes32(0), type(CounterFacts).creationCode
+                deployer,
+                0x00000000000000000000000000000000000000001d37bcb7d710043fdf64a216,
+                type(CounterFacts).creationCode
             );
             console2.log("Deployed CounterFacts to", facts);
         }
