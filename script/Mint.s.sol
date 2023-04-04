@@ -4,30 +4,36 @@ pragma solidity ^0.8.17;
 import { Script, console2 } from "forge-std/Script.sol";
 import { CounterFacts } from "../src/CounterFacts.sol";
 import { ConstructorMinter } from "../test/helpers/ConstructorMinter.sol";
+import { IERC721 } from "forge-std/interfaces/IERC721.sol";
+import { SSTORE2 } from "solady/utils/SSTORE2.sol";
 
 contract Mint is Script {
     function run() public {
-        uint256 key = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        vm.createSelectFork("mainnet");
 
-        address deployer = vm.rememberKey(key);
+        address minter;
+        bool ledger = vm.envOr("LEDGER", false);
+        if (ledger) {
+            minter = vm.envAddress("MINTER_ADDRESS");
+        } else {
+            uint256 key = vm.envUint("MINTER_PRIVATE_KEY");
+            minter = vm.rememberKey(key);
+        }
+
+        // uncomment for dry runs with no ether
+        // vm.deal(minter, 1 ether);
+
+        bytes32 salt = vm.envBytes32("SALT");
+        string memory text = vm.envString("PREDICTION_TEXT");
+
         CounterFacts counterFacts = CounterFacts(vm.envAddress("COUNTERFACTS"));
 
-        string[] memory networks = vm.envString("NETWORKS", ",");
-        for (uint256 i; i < networks.length; i++) {
-            string memory network = networks[i];
-            vm.createSelectFork(getChain(network).rpcUrl);
-            string memory data =
-                '<svg width="100" height="50"><text x="10" y="30" font-size="20">Hello World</text></svg>';
-            address prediction = counterFacts.predict(data, bytes32(0));
-            vm.broadcast(deployer);
-            uint256 tokenId = counterFacts.mint(prediction);
-            vm.broadcast(deployer);
-            counterFacts.reveal(tokenId, data, bytes32(0));
+        address prediction = SSTORE2.predictDeterministicAddress(
+            bytes(text), salt, address(counterFacts)
+        );
 
-            address facts = address(counterFacts);
-            console2.log("Deployed CounterFacts to", facts);
-            vm.broadcast(deployer);
-            new ConstructorMinter(facts);
-        }
+        vm.broadcast(minter);
+        uint256 tokenId = counterFacts.mint(prediction);
+        console2.log("Minted token", tokenId);
     }
 }
