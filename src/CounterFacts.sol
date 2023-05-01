@@ -23,69 +23,133 @@ import { LibString } from "solady/utils/LibString.sol";
  *         contains.
  */
 contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
-    error ContractExists();
     error IncorrectStorageAddress();
-    error DuplicateCounterFact();
+    error InsufficientTimePassed();
     error TokenDoesNotExist(uint256 tokenId);
 
     event MetadataUpdate(uint256 _tokenId);
 
-    struct DataContract {
-        address dataContract;
-        bool deployed;
+    uint256 public constant MINT_DELAY = 1 minutes;
+    uint256 internal constant UINT96_MASK = 0xffffffffffffffffffffffff;
+
+    struct CounterFactMetadata {
+        address creator;
+        uint96 mintTime;
+        bytes32 validationHash;
     }
 
     uint256 public nextTokenId;
-    mapping(uint256 tokenId => address creator) public creators;
-    mapping(uint256 tokenId => DataContract dataContract) internal
-        _dataContracts;
-    mapping(address dataContract => uint256 tokenId) public
-        dataContractToTokenId;
+    mapping(uint256 tokenId => CounterFactMetadata metadata) internal
+        _tokenMetadata;
+    mapping(uint256 tokenId => address dataContractAddress) internal
+        _dataContractAddresses;
 
     /**
-     * @notice Mint a new CounterFact™ by providing the deterministic address
-     * of its contents (must currently be empty).
+     * @notice Mint a new CounterFact™ by providing a validation hash that
+     * will be checked at time of reveal. The validation hash is a function of
+     * both the counterfactual data contract address and the token creator.
+     * By providing a hash that is dependent on both the data contract address
+     * and the minter address, the minter is protected from having their mint
+     * transaction front-run by a malicious actor, while still ensuring that the
+     * creator has pre-written their CounterFact™, since it requires knowing the
+     * data contract address in advance.
+     * @param validationHash The resultant hash of the counterfactual data
+     *        contract's address and the creator's address, calculated as
+     *        keccak256(abi.encode(dataContractAddress, creatorAddress)). Upon
+     *        revealing, the deployed data contract address will be hashed with
+     *        the creator's address and compared to this value. If they do not
+     *        match, the reveal will revert.
      */
-    function mint(address dataContract) public returns (uint256 tokenId) {
-        // this can be inaccurate if called during the constructor of
-        // dataContract, so also store a boolean flag when actually deployed
-        // by reveal()
-        if (dataContract.code.length > 0) {
-            revert ContractExists();
-        }
-        if (dataContractToTokenId[dataContract] != 0) {
-            revert DuplicateCounterFact();
-        }
+    function mint(bytes32 validationHash) public returns (uint256 tokenId) {
         // Increment tokenId before minting to avoid tokenId 0
         tokenId = ++nextTokenId;
-        // store the creator
-        creators[tokenId] = msg.sender;
-        // store the counterfactual contract address
-        _dataContracts[tokenId] =
-            DataContract({ dataContract: dataContract, deployed: false });
-        // store the tokenId in the reverse mapping
-        dataContractToTokenId[dataContract] = tokenId;
+        // retrieve storage pointer for new token
+        CounterFactMetadata storage metadata = _tokenMetadata[tokenId];
+        // store creator to compute validationHash
+        metadata.creator = msg.sender;
+        // store timestamp to prevent front-running reveals
+        metadata.mintTime = uint96(block.timestamp);
+        // store validationHash to check against on reveal
+        metadata.validationHash = validationHash;
         _mint(msg.sender, tokenId);
+    }
+
+    function tokenMetadata(uint256 tokenId)
+        public
+        view
+        returns (address creator, uint256 mintTime, bytes32 validationHash)
+    {
+        ///@solidity memory-safe-assembly
+        assembly {
+            // compute storage slot for token metadata
+            mstore(0, _tokenMetadata.slot)
+            mstore(0x20, tokenId)
+            let slot := keccak256(0, 0x40)
+            let packedCreatorTimestamp := sload(slot)
+            creator := shr(96, packedCreatorTimestamp)
+            mintTime := and(UINT96_MASK, packedCreatorTimestamp)
+            validationHash := sload(add(slot, 1))
+        }
+    }
+
+    function dataContractAddress(uint256 tokenId)
+        public
+        view
+        returns (address _addr)
+    {
+        ///@solidity memory-safe-assembly
+        assembly {
+            // compute storage slot for data contract address
+            mstore(0, _dataContractAddresses.slot)
+            mstore(0x20, tokenId)
+            let slot := keccak256(0, 0x40)
+            _addr := sload(slot)
+        }
     }
 
     /**
      * @notice Reveal the contents of a CounterFact™ by providing the data and
      *         salt that were used to generate the deterministic address used to
-     *         mint it.
+     *         mint it. Note that a one-minute delay is enforced between minting
+     *         and revealing to prevent malicious actors from front-running
+     *         reveals by minting and immediately revealing.
      */
-    function reveal(uint256 tokenId, string calldata data, bytes32 salt)
+    function reveal(uint256 tokenId, string calldata data, uint96 userSalt)
         public
     {
         if (_ownerOf[tokenId] == address(0)) {
             revert TokenDoesNotExist(tokenId);
         }
+        (address creator, uint256 mintTime, bytes32 validationHash) =
+            tokenMetadata(tokenId);
+        // enforce a delay to prevent front-running reveals by minting and then
+        // immediately revealing
+        if (block.timestamp < mintTime + MINT_DELAY) {
+            revert InsufficientTimePassed();
+        }
+        bytes32 salt;
+        ///@solidity memory-safe-assembly
+        assembly {
+            salt := or(shl(96, creator), userSalt)
+        }
+        // deploy counterfactual data contract
         address deployed = SSTORE2.writeDeterministic(bytes(data), salt);
-        DataContract memory dataContract = _dataContracts[tokenId];
-        // check that the deployed address matches the counterfactual address
-        if (deployed != dataContract.dataContract) {
+        // compute a validation hash from the data and the creator
+        bytes32 computedValidationHash;
+        ///@solidity memory-safe-assembly
+        assembly {
+            mstore(0, deployed)
+            mstore(0x20, creator)
+            computedValidationHash := keccak256(0, 0x40)
+        }
+        // compare it to the one provided at mint time
+        bytes32 validationhash = validationHash;
+        // if they don't match, the wrong data has been provided
+        if (validationhash != computedValidationHash) {
             revert IncorrectStorageAddress();
         }
-        _dataContracts[tokenId].deployed = true;
+        // store the address of the deployed data contract
+        _dataContractAddresses[tokenId] = deployed;
         // signal that the metadata has been updated
         emit MetadataUpdate(tokenId);
     }
@@ -95,11 +159,16 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
      *         CounterFact™'s contents. Note that you will be exposing the
      *         contents of the CounterFact™ to the RPC provider.
      */
-    function predict(string calldata data, bytes32 salt)
+    function predict(string calldata data, address creator, uint96 userSalt)
         public
         view
         returns (address)
     {
+        bytes32 salt;
+        ///@solidity memory-safe-assembly
+        assembly {
+            salt := or(shl(96, creator), userSalt)
+        }
         return SSTORE2.predictDeterministicAddress(
             bytes(data), salt, address(this)
         );
@@ -129,50 +198,41 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
             revert TokenDoesNotExist(tokenId);
         }
         string memory escapedString;
-
-        DataContract memory dataContractStruct = _dataContracts[tokenId];
-        address dataContract = dataContractStruct.dataContract;
-        if (dataContract.code.length > 0) {
-            if (dataContractStruct.deployed) {
+        (address creator,, bytes32 validationHash) = tokenMetadata(tokenId);
+        address dataContract = dataContractAddress(tokenId);
+        string memory lagniappe = "";
+        if (dataContract != address(0)) {
+            // escape JSON to avoid breaking the JSON
+            escapedString = LibString.escapeJSON(
                 // escape HTML to avoid embedding of non-text content
-                // escape JSON to avoid breaking the JSON
-                escapedString = LibString.escapeJSON(
-                    LibString.escapeHTML(string(SSTORE2.read(dataContract)))
-                );
-            } else {
-                escapedString = "data:text/plain,Very sneaky!";
-                return string.concat(
-                    '{"animation_url":"',
-                    escapedString,
-                    '","attributes":[{"trait_type":"Creator","value":"',
-                    "The Sneakooooor",
-                    '"},{"trait_type":"Data Contract","value":"',
-                    LibString.toHexString(dataContract),
-                    '"}, {"trait_type":"Sneaky","value":"Yes',
-                    '"}]}'
-                );
-            }
+                LibString.escapeHTML(string(SSTORE2.read(dataContract)))
+            );
+            escapedString = string.concat("data:text/plain,", escapedString);
+            // revealed tokens should specify "Yes" for revealed and the data
+            // contract address
+            lagniappe = string.concat(
+                '"Yes"},{"trait_type":"Data Contract","value":"',
+                LibString.toHexString(dataContract)
+            );
         } else {
             escapedString = "This CounterFact has not yet been revealed.";
+            // unrevealed tokens should specify "No" for revealed and no data
+            // contract address
+            lagniappe = '"No"';
         }
+        // specify plaintext encoding
         escapedString = string.concat("data:text/plain,", escapedString);
         return string.concat(
             '{"animation_url":"',
             escapedString,
             '","attributes":[{"trait_type":"Creator","value":"',
-            LibString.toHexString(creators[tokenId]),
-            '"},{"trait_type":"Data Contract","value":"',
-            LibString.toHexString(dataContract),
-            '"}]}'
+            LibString.toHexString(creator),
+            '"},{"trait_type":"Validation Hash","value":"',
+            LibString.toHexString(uint256(validationHash)),
+            '"},{"trait_type":"Revealed?","value":',
+            lagniappe,
+            "}]}"
         );
-    }
-
-    function getDataContract(uint256 tokenId)
-        public
-        view
-        returns (DataContract memory dataContract)
-    {
-        return _dataContracts[tokenId];
     }
 
     function contractURI() public pure returns (string memory) {
