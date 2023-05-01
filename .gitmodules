@@ -6,8 +6,8 @@
 	url = https://github.com/vectorized/solady
 branch = v0.0.78
 [submodule "lib/solmate"]
-path = lib/solmate
-url = https://github.com/transmissions11/solmate
+	path = lib/solmate
+	url = https://github.com/transmissions11/solmate
 [submodule "lib/openzeppelin-contracts"]
 path = lib/openzeppelin-contracts
 url = https://github.com/openzeppelin/openzeppelin-contracts
