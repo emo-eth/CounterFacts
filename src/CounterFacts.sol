@@ -32,15 +32,14 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
     uint256 public constant MINT_DELAY = 1 minutes;
     uint256 internal constant UINT96_MASK = 0xffffffffffffffffffffffff;
 
-    struct CounterFactMetadata {
+    struct Metadata {
         address creator;
         uint96 mintTime;
         bytes32 validationHash;
     }
 
     uint256 public nextTokenId;
-    mapping(uint256 tokenId => CounterFactMetadata metadata) internal
-        _tokenMetadata;
+    mapping(uint256 tokenId => Metadata metadata) internal _tokenMetadata;
     mapping(uint256 tokenId => address dataContractAddress) internal
         _dataContractAddresses;
 
@@ -63,14 +62,25 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
     function mint(bytes32 validationHash) public returns (uint256 tokenId) {
         // Increment tokenId before minting to avoid tokenId 0
         tokenId = ++nextTokenId;
-        // retrieve storage pointer for new token
-        CounterFactMetadata storage metadata = _tokenMetadata[tokenId];
-        // store creator to compute validationHash
-        metadata.creator = msg.sender;
-        // store timestamp to prevent front-running reveals
-        metadata.mintTime = uint96(block.timestamp);
-        // store validationHash to check against on reveal
-        metadata.validationHash = validationHash;
+
+        ///@solidity memory-safe-assembly
+        assembly {
+            // compute storage slot for data contract address
+            mstore(0, tokenId)
+            mstore(0x20, _dataContractAddresses.slot)
+            let slot := keccak256(0, 0x40)
+            // pack caller and mintTime
+            let packedCreatorTimestamp :=
+                or(
+                    // msg.sender in top 160 bits
+                    shl(96, caller()),
+                    // will overflow uint96 in 2.5 quadrillion million years
+                    timestamp()
+                )
+            sstore(slot, packedCreatorTimestamp)
+            // store validationHash in the next slot
+            sstore(add(slot, 1), validationHash)
+        }
         _mint(msg.sender, tokenId);
     }
 
@@ -79,17 +89,15 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
         view
         returns (address creator, uint256 mintTime, bytes32 validationHash)
     {
+        bytes32 slot;
         ///@solidity memory-safe-assembly
         assembly {
-            // compute storage slot for token metadata
-            mstore(0, _tokenMetadata.slot)
-            mstore(0x20, tokenId)
-            let slot := keccak256(0, 0x40)
-            let packedCreatorTimestamp := sload(slot)
-            creator := shr(96, packedCreatorTimestamp)
-            mintTime := and(UINT96_MASK, packedCreatorTimestamp)
-            validationHash := sload(add(slot, 1))
+            // compute storage slot for data contract address
+            mstore(0, tokenId)
+            mstore(0x20, _dataContractAddresses.slot)
+            slot := keccak256(0, 0x40)
         }
+        (creator, mintTime, validationHash) = _loadTokenMetadataFromSlot(slot);
     }
 
     function dataContractAddress(uint256 tokenId)
@@ -100,8 +108,8 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
         ///@solidity memory-safe-assembly
         assembly {
             // compute storage slot for data contract address
-            mstore(0, _dataContractAddresses.slot)
-            mstore(0x20, tokenId)
+            mstore(0, tokenId)
+            mstore(0x20, _dataContractAddresses.slot)
             let slot := keccak256(0, 0x40)
             _addr := sload(slot)
         }
@@ -117,9 +125,8 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
     function reveal(uint256 tokenId, string calldata data, uint96 userSalt)
         public
     {
-        if (_ownerOf[tokenId] == address(0)) {
-            revert TokenDoesNotExist(tokenId);
-        }
+        _assertExists(tokenId);
+
         (address creator, uint256 mintTime, bytes32 validationHash) =
             tokenMetadata(tokenId);
         // enforce a delay to prevent front-running reveals by minting and then
@@ -148,8 +155,16 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
         if (validationhash != computedValidationHash) {
             revert IncorrectStorageAddress();
         }
-        // store the address of the deployed data contract
-        _dataContractAddresses[tokenId] = deployed;
+        // store the address of the deployed data contract:
+        // _dataContractAddresses[tokenId] = deployed;
+        ///@solidity memory-safe-assembly
+        assembly {
+            // compute storage slot for data contract address
+            mstore(0, tokenId)
+            mstore(0x20, _dataContractAddresses.slot)
+            let slot := keccak256(0, 0x40)
+            sstore(slot, deployed)
+        }
         // signal that the metadata has been updated
         emit MetadataUpdate(tokenId);
     }
@@ -189,14 +204,15 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
         );
     }
 
+    event log(address);
     /**
      * @notice Get the string URI for a CounterFact™'s metadata, for
      * convenience.
      */
-    function stringURI(uint256 tokenId) public view returns (string memory) {
-        if (_ownerOf[tokenId] == address(0)) {
-            revert TokenDoesNotExist(tokenId);
-        }
+
+    function stringURI(uint256 tokenId) public returns (string memory) {
+        _assertExists(tokenId);
+
         string memory escapedString;
         (address creator,, bytes32 validationHash) = tokenMetadata(tokenId);
         address dataContract = dataContractAddress(tokenId);
@@ -248,5 +264,37 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
                 )
             )
         );
+    }
+
+    function _loadTokenMetadataFromSlot(bytes32 slot)
+        internal
+        view
+        returns (address creator, uint256 mintTime, bytes32 validationHash)
+    {
+        ///@solidity memory-safe-assembly
+        assembly {
+            slot := keccak256(0, 0x40)
+            let packedCreatorTimestamp := sload(slot)
+            // unpack creator and mintTime
+            creator := shr(96, packedCreatorTimestamp)
+            mintTime := and(UINT96_MASK, packedCreatorTimestamp)
+            // load validationHash from next slot
+            validationHash := sload(add(slot, 1))
+        }
+    }
+
+    function _assertExists(uint256 tokenId) internal view {
+        address owner;
+        ///@solidity memory-safe-assembly
+        assembly {
+            // compute storage slot for owner
+            mstore(0, tokenId)
+            mstore(0x20, _ownerOf.slot)
+            let slot := keccak256(0, 0x40)
+            owner := sload(slot)
+        }
+        if (owner == address(0)) {
+            revert TokenDoesNotExist(tokenId);
+        }
     }
 }

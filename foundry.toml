@@ -8,7 +8,7 @@ remappings = [
     'solady/=lib/solady/src/',
     'create2-scripts/=lib/create2-helpers/script/',
 ]
-optimizer_runs=4_294_967_295
+optimizer_runs = 4_294_967_295
 
 [rpc_endpoints]
 mainnet = '${ETHEREUM_RPC_URL}'
@@ -19,5 +19,8 @@ bracket_spacing = true
 number_underscore = "thousands"
 wrap_comments = true
 line_length = 80
+
+[fuzz]
+runs = 10000
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
