@@ -2,8 +2,8 @@
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
 [submodule "lib/solady"]
-path = lib/solady
-url = https://github.com/vectorized/solady
+	path = lib/solady
+	url = https://github.com/vectorized/solady
 branch = v0.0.78
 [submodule "lib/solmate"]
 path = lib/solmate
