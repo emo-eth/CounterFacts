@@ -13,5 +13,5 @@ branch = v0.0.78
 	url = https://github.com/openzeppelin/openzeppelin-contracts
 branch = v4.8.1
 [submodule "lib/create2-helpers"]
-path = lib/create2-helpers
-url = https://github.com/emo-eth/create2-helpers
+	path = lib/create2-helpers
+	url = https://github.com/emo-eth/create2-helpers
