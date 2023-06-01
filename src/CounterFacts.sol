@@ -67,7 +67,7 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
         assembly {
             // compute storage slot for data contract address
             mstore(0, tokenId)
-            mstore(0x20, _dataContractAddresses.slot)
+            mstore(0x20, _tokenMetadata.slot)
             let slot := keccak256(0, 0x40)
             // pack caller and mintTime
             let packedCreatorTimestamp :=
@@ -94,7 +94,7 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
         assembly {
             // compute storage slot for data contract address
             mstore(0, tokenId)
-            mstore(0x20, _dataContractAddresses.slot)
+            mstore(0x20, _tokenMetadata.slot)
             slot := keccak256(0, 0x40)
         }
         (creator, mintTime, validationHash) = _loadTokenMetadataFromSlot(slot);
@@ -210,7 +210,7 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
      * convenience.
      */
 
-    function stringURI(uint256 tokenId) public returns (string memory) {
+    function stringURI(uint256 tokenId) public view returns (string memory) {
         _assertExists(tokenId);
 
         string memory escapedString;
