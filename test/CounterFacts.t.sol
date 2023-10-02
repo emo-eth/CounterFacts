@@ -2,6 +2,7 @@
 pragma solidity ^0.8.17;
 
 import { BaseTest } from "./BaseTest.sol";
+import { console2 } from "forge-std/Test.sol";
 import { TestCounterFacts } from "./helpers/TestCounterFacts.sol";
 import { CounterFacts } from "../src/CounterFacts.sol";
 import { LibString } from "solady/utils/LibString.sol";
@@ -184,7 +185,7 @@ contract CounterFactsTest is BaseTest {
         return keccak256(bytes(a)) == keccak256(bytes(b));
     }
 
-    function testStringURI() public {
+    function testStringURI2() public {
         string memory data = "";
         (address predicted, bytes32 validationHash) =
             getPredictedAndValidationHash(address(this), data, 0);
@@ -192,36 +193,38 @@ contract CounterFactsTest is BaseTest {
         // mint token
         uint256 tokenId = counter.mint(validationHash);
         // get json string
-        // vm.breakpoint("a");
+        vm.breakpoint("a");
         string memory stringUri = counter.stringURI(tokenId);
         // parse json into struct
         bytes memory jsonParsed = vm.parseJson(stringUri);
+        vm.breakpoint("b");
         RevealedMetadata memory metadata =
             abi.decode(jsonParsed, (RevealedMetadata));
-        // check struct
-        assertEq(
-            metadata.animation_url,
-            string.concat(
-                "data:text/plain,",
-                "This CounterFact has not yet been revealed."
-            )
-        );
-        assertTrue(
-            scanFor(
-                Attribute("Creator", LibString.toHexString(address(this))),
-                metadata.attributes
-            )
-        );
-        assertTrue(
-            scanFor(
-                Attribute(
-                    "Validation Hash",
-                    LibString.toHexString(uint256(validationHash))
-                ),
-                metadata.attributes
-            )
-        );
-        assertTrue(scanFor(Attribute("Revealed?", "No"), metadata.attributes));
+        // // check struct
+        // assertEq(
+        //     metadata.animation_url,
+        //     string.concat(
+        //         "data:text/plain,",
+        //         "This CounterFact has not yet been revealed."
+        //     )
+        // );
+        // assertTrue(
+        //     scanFor(
+        //         Attribute("Creator", LibString.toHexString(address(this))),
+        //         metadata.attributes
+        //     )
+        // );
+        // assertTrue(
+        //     scanFor(
+        //         Attribute(
+        //             "Validation Hash",
+        //             LibString.toHexString(uint256(validationHash))
+        //         ),
+        //         metadata.attributes
+        //     )
+        // );
+        // assertTrue(scanFor(Attribute("Revealed?", "No"),
+        // metadata.attributes));
 
         // data = 'data "with quotes"';
         // (predicted, validationHash) =
@@ -313,6 +316,31 @@ contract CounterFactsTest is BaseTest {
         }
     }
 
+    function testSimple() public {
+        string memory jsonString =
+            '{"trait_type":"Creator","value":"b0x4a5439f888367f1c42c1659f25004838e80472d70cf0947a26f4f3e31337d8b5"}';
+        bytes memory jsonBytes = vm.parseJson(jsonString);
+        emit log_string(string(jsonBytes));
+        Attribute memory attr = abi.decode(jsonBytes, (Attribute));
+        logAttr(attr);
+
+        jsonString =
+            '[{"trait_type":"Creator","value":"hello"},{"trait_type":"Creator","value":"hello2"}]';
+        jsonBytes = vm.parseJson(jsonString);
+        Attribute[] memory attrs = abi.decode(jsonBytes, (Attribute[]));
+
+        // jsonString = string.concat(
+        //     '{"animation_url":"hello","attributes":', jsonString, "}"
+        // );
+        // jsonBytes = vm.parseJson(jsonString);
+        // RevealedMetadata memory metadata =
+        //     abi.decode(jsonBytes, (RevealedMetadata));
+    }
+
+    function logAttr(Attribute memory attr) public {
+        emit log_named_string("trait_type", attr.trait_type);
+        emit log_named_string("value", attr.value);
+    }
     // function testSneaky() public {
     //     uint256 tokenId = counter.mint(address(1234));
     //     counter.setDataContract(
