@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.17;
 
-import { CounterFacts } from "../../src/CounterFacts.sol";
+import { Counterfacts } from "../../src/Counterfacts.sol";
 import { SSTORE2 } from "solady/utils/SSTORE2.sol";
 
-contract TestCounterFacts is CounterFacts {
-    function setMetadata(uint256 tokenId, CounterFacts.Metadata memory data)
+contract TestCounterfacts is Counterfacts {
+    function setMetadata(uint256 tokenId, Counterfacts.Metadata memory data)
         public
     {
         _tokenMetadata[tokenId] = data;
@@ -16,19 +16,19 @@ contract TestCounterFacts is CounterFacts {
     }
 
     function getTokenSVG(uint256 tokenId) public view returns (string memory) {
-        (address creator, uint256 timestamp, bytes32 validationHash) =
-            tokenMetadata(tokenId);
-        address dataContract = dataContractAddress(tokenId);
+        Metadata storage metadata = _tokenMetadata[tokenId];
 
-        string memory rawString = "This CounterFact has not yet been revealed.";
+        address dataContract = _dataContractAddresses[tokenId];
+
+        string memory rawString = "This Counterfact has not yet been revealed.";
         if (dataContract != address(0)) {
             rawString = string(SSTORE2.read(dataContract));
         }
 
         return tokenSVG({
-            creator: creator,
-            mintTime: timestamp,
-            validationHash: validationHash,
+            creator: metadata.creator,
+            mintTime: metadata.mintTime,
+            validationHash: metadata.validationHash,
             dataContract: dataContract,
             content: rawString
         });

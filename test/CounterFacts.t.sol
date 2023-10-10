@@ -2,16 +2,17 @@
 pragma solidity ^0.8.17;
 
 import { BaseTest } from "./BaseTest.sol";
+import { ERC721 } from "solady/tokens/ERC721.sol";
 import { console2 } from "forge-std/Test.sol";
-import { TestCounterFacts } from "./helpers/TestCounterFacts.sol";
-import { CounterFacts } from "../src/CounterFacts.sol";
+import { TestCounterfacts } from "./helpers/TestCounterfacts.sol";
+import { Counterfacts } from "../src/Counterfacts.sol";
 import { LibString } from "solady/utils/LibString.sol";
 import { Base64 } from "solady/utils/Base64.sol";
 import { ConstructorMinter } from "./helpers/ConstructorMinter.sol";
 import { Base64 } from "solady/utils/Base64.sol";
 
-contract CounterFactsTest is BaseTest {
-    TestCounterFacts counter;
+contract CounterfactsTest is BaseTest {
+    TestCounterfacts counter;
 
     event MetadataUpdate(uint256 _tokenId);
 
@@ -28,7 +29,7 @@ contract CounterFactsTest is BaseTest {
     function setUp() public virtual override {
         super.setUp();
         vm.warp(1_696_961_599);
-        counter = new TestCounterFacts();
+        counter = new TestCounterfacts();
     }
 
     function testMintPackUnpack(
@@ -87,13 +88,13 @@ contract CounterFactsTest is BaseTest {
     // }
 
     // function testMint_ContractExists() public {
-    //     vm.expectRevert(CounterFacts.ContractExists.selector);
+    //     vm.expectRevert(Counterfacts.ContractExists.selector);
     //     counter.mint(address(this));
     // }
 
-    // function testMint_DuplicateCounterFact() public {
+    // function testMint_DuplicateCounterfact() public {
     //     counter.mint(address(1234));
-    //     vm.expectRevert(CounterFacts.DuplicateCounterFact.selector);
+    //     vm.expectRevert(Counterfacts.DuplicateCounterfact.selector);
     //     counter.mint(address(1234));
     // }
 
@@ -109,7 +110,7 @@ contract CounterFactsTest is BaseTest {
 
     function testReveal_TokenDoesNotExist() public {
         vm.expectRevert(
-            abi.encodeWithSelector(CounterFacts.TokenDoesNotExist.selector, 1)
+            abi.encodeWithSelector(ERC721.TokenDoesNotExist.selector)
         );
         counter.reveal(1, "data", 0);
     }
@@ -117,7 +118,7 @@ contract CounterFactsTest is BaseTest {
     function testReveal_IncorrectStorageAddress() public {
         uint256 tokenId = counter.mint(bytes32(0));
         vm.warp(block.timestamp + 60);
-        vm.expectRevert(CounterFacts.IncorrectStorageAddress.selector);
+        vm.expectRevert(Counterfacts.IncorrectStorageAddress.selector);
         counter.reveal(tokenId, "data", 0);
     }
 
@@ -125,7 +126,7 @@ contract CounterFactsTest is BaseTest {
         address predicted = counter.predict("data", address(this), 0);
         uint256 tokenId =
             counter.mint(keccak256(abi.encode(predicted, address(this))));
-        vm.expectRevert(CounterFacts.InsufficientTimePassed.selector);
+        vm.expectRevert(Counterfacts.InsufficientTimePassed.selector);
         counter.reveal(tokenId, "data", 0);
     }
 
@@ -173,9 +174,9 @@ contract CounterFactsTest is BaseTest {
 
     function testStringURI_TokenDoesNotExist() public {
         vm.expectRevert(
-            abi.encodeWithSelector(CounterFacts.TokenDoesNotExist.selector, 1)
+            abi.encodeWithSelector(ERC721.TokenDoesNotExist.selector)
         );
-        counter.stringURI(1);
+        counter.tokenURI(1);
     }
 
     function scanFor(Attribute memory attr, Attribute[] memory attrs)
@@ -203,58 +204,60 @@ contract CounterFactsTest is BaseTest {
         return keccak256(bytes(a)) == keccak256(bytes(b));
     }
 
-    function testStringURI2() public {
-        string memory data = "";
-        (address predicted, bytes32 validationHash) =
-            getPredictedAndValidationHash(address(this), data, 0);
+    // function testStringURI2() public {
+    //     string memory data = "";
+    //     (address predicted, bytes32 validationHash) =
+    //         getPredictedAndValidationHash(address(this), data, 0);
 
-        // mint token
-        uint256 tokenId = counter.mint(validationHash);
-        // get json string
-        vm.breakpoint("a");
-        string memory stringUri = counter.stringURI(tokenId);
-        // parse json into struct
-        bytes memory jsonParsed = vm.parseJson(stringUri);
-        vm.breakpoint("b");
-        RevealedMetadata memory metadata =
-            abi.decode(jsonParsed, (RevealedMetadata));
-        // // check struct
-        // assertEq(
-        //     metadata.animation_url,
-        //     string.concat(
-        //         "data:text/plain,",
-        //         "This CounterFact has not yet been revealed."
-        //     )
-        // );
-        // assertTrue(
-        //     scanFor(
-        //         Attribute("Creator", LibString.toHexString(address(this))),
-        //         metadata.attributes
-        //     )
-        // );
-        // assertTrue(
-        //     scanFor(
-        //         Attribute(
-        //             "Validation Hash",
-        //             LibString.toHexString(uint256(validationHash))
-        //         ),
-        //         metadata.attributes
-        //     )
-        // );
-        // assertTrue(scanFor(Attribute("Revealed?", "No"),
-        // metadata.attributes));
+    //     // mint token
+    //     uint256 tokenId = counter.mint(validationHash);
+    //     // get json string
+    //     vm.breakpoint("a");
+    //     string memory stringUri = counter.stringURI(tokenId);
+    //     // parse json into struct
+    //     bytes memory jsonParsed = vm.parseJson(stringUri);
+    //     vm.breakpoint("b");
+    //     RevealedMetadata memory metadata =
+    //         abi.decode(jsonParsed, (RevealedMetadata));
+    //     // // check struct
+    //     // assertEq(
+    //     //     metadata.animation_url,
+    //     //     string.concat(
+    //     //         "data:text/plain,",
+    //     //         "This Counterfact has not yet been revealed."
+    //     //     )
+    //     // );
+    //     // assertTrue(
+    //     //     scanFor(
+    //     //         Attribute("Creator",
+    // LibString.toHexString(address(this))),
+    //     //         metadata.attributes
+    //     //     )
+    //     // );
+    //     // assertTrue(
+    //     //     scanFor(
+    //     //         Attribute(
+    //     //             "Validation Hash",
+    //     //             LibString.toHexString(uint256(validationHash))
+    //     //         ),
+    //     //         metadata.attributes
+    //     //     )
+    //     // );
+    //     // assertTrue(scanFor(Attribute("Revealed?", "No"),
+    //     // metadata.attributes));
 
-        // data = 'data "with quotes"';
-        // (predicted, validationHash) =
-        //     getPredictedAndValidationHash(address(this), data, 0);
-        // tokenId = counter.mint(validationHash);
-        // counter.reveal(tokenId, data, 0);
-        // assertEq(
-        //     counter.stringURI(tokenId),
-        //     _generateString(data, address(this), predicted, validationHash)
-        // );
-        // vm.parseJson
-    }
+    //     // data = 'data "with quotes"';
+    //     // (predicted, validationHash) =
+    //     //     getPredictedAndValidationHash(address(this), data, 0);
+    //     // tokenId = counter.mint(validationHash);
+    //     // counter.reveal(tokenId, data, 0);
+    //     // assertEq(
+    //     //     counter.stringURI(tokenId),
+    //     //     _generateString(data, address(this), predicted,
+    // validationHash)
+    //     // );
+    //     // vm.parseJson
+    // }
 
     function getPredictedAndValidationHash(
         address creator,
@@ -309,7 +312,7 @@ contract CounterFactsTest is BaseTest {
         } else {
             data = LibString.concat(
                 "data:text/plain,",
-                "This CounterFact has not yet been revealed."
+                "This Counterfact has not yet been revealed."
             );
         }
         string memory thing = string.concat(
@@ -363,7 +366,7 @@ contract CounterFactsTest is BaseTest {
     //     uint256 tokenId = counter.mint(address(1234));
     //     counter.setDataContract(
     //         tokenId,
-    //         CounterFacts.DataContract({
+    //         Counterfacts.DataContract({
     //             dataContract: address(this),
     //             deployed: false
     //         })

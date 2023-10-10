@@ -2,7 +2,7 @@
 // pragma solidity ^0.8.17;
 
 // import { Script, console2 } from "forge-std/Script.sol";
-// import { CounterFacts } from "../src/CounterFacts.sol";
+// import { Counterfacts } from "../src/Counterfacts.sol";
 // import { ConstructorMinter } from "../test/helpers/ConstructorMinter.sol";
 // import { IERC721 } from "forge-std/interfaces/IERC721.sol";
 // import { SSTORE2 } from "solady/utils/SSTORE2.sol";
@@ -26,8 +26,8 @@
 //         bytes32 salt = vm.envBytes32("SALT");
 //         string memory text = vm.envString("PREDICTION_TEXT");
 
-//         CounterFacts counterFacts =
-// CounterFacts(vm.envAddress("COUNTERFACTS"));
+//         Counterfacts counterFacts =
+// Counterfacts(vm.envAddress("COUNTERFACTS"));
 
 //         address prediction = SSTORE2.predictDeterministicAddress(
 //             bytes(text), salt, address(counterFacts)
