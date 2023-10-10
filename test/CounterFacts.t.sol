@@ -27,6 +27,7 @@ contract CounterFactsTest is BaseTest {
 
     function setUp() public virtual override {
         super.setUp();
+        vm.warp(1_696_961_599);
         counter = new TestCounterFacts();
     }
 
@@ -45,6 +46,23 @@ contract CounterFactsTest is BaseTest {
         assertEq(_timestamp, timestamp, "timestamp != timestamp");
         assertEq(_validation, validationHash, "validation != validationHash");
         assertEq(counter.ownerOf(tokenId), creator);
+    }
+
+    function testGetTokenSVG() public {
+        uint256 tokenId = counter.mint(bytes32(uint256(1234)));
+        assertEq(counter.ownerOf(tokenId), address(this));
+        string memory svg = counter.getTokenSVG(tokenId);
+        vm.writeFile("x.svg", svg);
+
+        string memory data =
+            "this is a really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really really long string";
+        address predicted = counter.predict(data, address(this), 0);
+        tokenId = counter.mint(keccak256(abi.encode(predicted, address(this))));
+        vm.warp(block.timestamp + 120);
+
+        counter.reveal(tokenId, data, 0);
+        svg = counter.getTokenSVG(tokenId);
+        vm.writeFile("y.svg", svg);
     }
 
     // function testMint() public {

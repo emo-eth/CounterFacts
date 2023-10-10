@@ -213,42 +213,106 @@ contract CounterFacts is ERC721(unicode"CounterFacts™", "COUNTER") {
     function stringURI(uint256 tokenId) public view returns (string memory) {
         _assertExists(tokenId);
 
-        string memory escapedString;
-        (address creator,, bytes32 validationHash) = tokenMetadata(tokenId);
+        (address creator, uint256 timestamp, bytes32 validationHash) =
+            tokenMetadata(tokenId);
+
         address dataContract = dataContractAddress(tokenId);
-        string memory lagniappe = "";
+        string memory rawString;
+        string memory revealedTraits = "";
         if (dataContract != address(0)) {
-            // escape JSON to avoid breaking the JSON
-            escapedString = LibString.escapeJSON(
-                // escape HTML to avoid embedding of non-text content
-                LibString.escapeHTML(string(SSTORE2.read(dataContract)))
-            );
-            escapedString = string.concat("data:text/plain,", escapedString);
+            // escape HTML to avoid embedding of non-text content
+
+            rawString = LibString.escapeHTML(string(SSTORE2.read(dataContract)));
+
             // revealed tokens should specify "Yes" for revealed and the data
             // contract address
-            lagniappe = string.concat(
+            revealedTraits = string.concat(
                 '"Yes"},{"trait_type":"Data Contract","value":"',
                 LibString.toHexString(dataContract)
             );
         } else {
-            escapedString = "This CounterFact has not yet been revealed.";
+            rawString = "This CounterFact has not yet been revealed.";
             // unrevealed tokens should specify "No" for revealed and no data
             // contract address
-            lagniappe = '"No"';
+            revealedTraits = '"No"';
         }
         // specify plaintext encoding
-        escapedString = string.concat("data:text/plain,", escapedString);
+        string memory svg = string.concat(
+            "data:image/svg+xml;base64,",
+            Base64.encode(
+                bytes(
+                    tokenSVG(
+                        creator,
+                        timestamp,
+                        validationHash,
+                        dataContract,
+                        rawString
+                    )
+                )
+            )
+        );
         return string.concat(
-            '{"animation_url":"',
-            escapedString,
+            '{"image":"',
+            svg,
+            '"text":"',
+            LibString.escapeJSON(rawString),
             '","attributes":[{"trait_type":"Creator","value":"',
-            LibString.toHexString(creator),
+            LibString.toHexString(uint256(uint160(creator)), 20),
             '"},{"trait_type":"Validation Hash","value":"',
-            LibString.toHexString(uint256(validationHash)),
+            LibString.toHexString(uint256(validationHash), 32),
             '"},{"trait_type":"Revealed?","value":',
-            lagniappe,
+            revealedTraits,
             "}]}"
         );
+    }
+
+    function tokenSVG(
+        address creator,
+        uint256 mintTime,
+        bytes32 validationHash,
+        address dataContract,
+        string memory content
+    ) internal pure returns (string memory) {
+        content = LibString.escapeHTML(content);
+        string[7] memory colors =
+            ["#e44", "#f71", "#eb0", "#2c5", "#0ae", "#85f", "#777"];
+        uint256 colorIndex = uint256(validationHash) % colors.length;
+        string memory color = colors[colorIndex];
+
+        return string.concat(
+            '<svg xmlns="http://www.w3.org/2000/svg" style="background:#151520" viewBox="0 0 700 300"><path id="a" fill="#151520" d="M20 10h655a10 10 0 0 1 10 10v260a20 10 0 0 1-10 10H20a20 10 0 0 1-10-10V10z"/><text fill="',
+            color,
+            unicode'" dominant-baseline="middle" font-family="Menlo,monospace" font-size="12"><textPath href="#a"><![CDATA[ ',
+            marquee(creator, mintTime, validationHash, dataContract),
+            ']]></textPath></text><path fill="rgba(0,0,0,0)" stroke="',
+            color,
+            '" d="M20 20h645a10 10 0 0 1 10 10v240a10 10 0 0 1-10 10H30a10 10 0 0 1-10-10V20z"/><foreignObject x="40" y="15" width="85%" height="85%"><div style="font-family:Menlo,monospace;color:#fff;display:flex;align-items:center;justify-content:left;font-size:0.8em;"  xmlns="http://www.w3.org/1999/xhtml"><p>',
+            content,
+            "</p></div></foreignObject></svg>"
+        );
+    }
+
+    function marquee(
+        address creator,
+        uint256 mintTime,
+        bytes32 validationHash,
+        address dataContract
+    ) internal pure returns (string memory result) {
+        result = string.concat(
+            "Creator: ",
+            LibString.toHexString(uint256(uint160(creator)), 20),
+            " Mint Timestamp: ",
+            LibString.toString(mintTime),
+            " Validation Hash: ",
+            LibString.toHexString(uint256(validationHash), 32)
+        );
+        if (dataContract != address(0)) {
+            result = string.concat(
+                result,
+                " Data Contract: ",
+                LibString.toHexString(uint256(uint160(dataContract)), 20)
+            );
+        }
     }
 
     function contractURI() public pure returns (string memory) {
