@@ -4,11 +4,11 @@ out = 'out'
 libs = ['lib']
 bytecode_hash = 'none'
 remappings = [
-    'solmate/=lib/solmate/src/',
     'solady/=lib/solady/src/',
     'create2-scripts/=lib/create2-helpers/script/',
 ]
 optimizer_runs = 4_294_967_295
+fs_permissions = [{ access = "read-write", path = './' }]
 
 [rpc_endpoints]
 mainnet = '${ETHEREUM_RPC_URL}'

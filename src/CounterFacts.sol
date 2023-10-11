@@ -31,32 +31,39 @@ contract Counterfacts is ERC721 {
     uint256 public constant MINT_DELAY = 1 minutes;
     uint256 internal constant UINT96_MASK = 0xffffffffffffffffffffffff;
 
-    struct Metadata {
+    struct MintMetadata {
         address creator;
         uint96 mintTime;
         bytes32 validationHash;
     }
 
     uint256 public nextTokenId;
-    mapping(uint256 tokenId => Metadata metadata) internal _tokenMetadata;
+    mapping(uint256 tokenId => MintMetadata metadata) internal _mintMetadata;
     mapping(uint256 tokenId => address dataContractAddress) internal
         _dataContractAddresses;
 
+    /**
+     * @notice Get the name of the token.
+     *
+     */
     function name() public pure override returns (string memory) {
         return unicode"Counterfacts™";
     }
 
+    /**
+     * @notice Get the symbol of the token.
+     */
     function symbol() public pure override returns (string memory) {
         return "COUNTER";
     }
 
-    function tokenMetadata(uint256 tokenId)
+    function mintMetadata(uint256 tokenId)
         public
         view
         returns (address creator, uint256 mintTime, bytes32 validationHash)
     {
         _assertExists(tokenId);
-        Metadata storage metadata = _tokenMetadata[tokenId];
+        MintMetadata storage metadata = _mintMetadata[tokenId];
         creator = metadata.creator;
         mintTime = metadata.mintTime;
         validationHash = metadata.validationHash;
@@ -92,7 +99,7 @@ contract Counterfacts is ERC721 {
         unchecked {
             tokenId = ++nextTokenId;
         }
-        Metadata storage metadata = _tokenMetadata[tokenId];
+        MintMetadata storage metadata = _mintMetadata[tokenId];
         metadata.creator = msg.sender;
         metadata.mintTime = uint96(block.timestamp);
         metadata.validationHash = validationHash;
@@ -111,7 +118,7 @@ contract Counterfacts is ERC721 {
     {
         _assertExists(tokenId);
 
-        Metadata storage metadata = _tokenMetadata[tokenId];
+        MintMetadata storage metadata = _mintMetadata[tokenId];
         address creator = metadata.creator;
         uint256 mintTime = metadata.mintTime;
 
@@ -176,7 +183,7 @@ contract Counterfacts is ERC721 {
     {
         _assertExists(tokenId);
 
-        Metadata storage metadata = _tokenMetadata[tokenId];
+        MintMetadata storage metadata = _mintMetadata[tokenId];
         address creator = metadata.creator;
         uint256 mintTime = metadata.mintTime;
         bytes32 validationHash = metadata.validationHash;
@@ -205,12 +212,12 @@ contract Counterfacts is ERC721 {
             "data:image/svg+xml;base64,",
             Base64.encode(
                 bytes(
-                    tokenSVG(
+                    _tokenSVG(
                         creator,
                         mintTime,
                         validationHash,
                         dataContract,
-                        LibString.escapeHTML(rawString)
+                        rawString
                     )
                 )
             )
@@ -230,33 +237,48 @@ contract Counterfacts is ERC721 {
         );
     }
 
-    function tokenSVG(
+    /**
+     * @dev Generate the SVG for a Counterfact™.
+     *      Basically copied from horsefacts' very similar project:
+     *      https://github.com/horsefacts/commit-reveal
+     * @param creator The address of the creator of the token
+     * @param mintTime The time at which the token was minted
+     * @param validationHash The validation hash of the token from mint time
+     * @param dataContract The address of the data contract, if it exists
+     * @param rawContent Unescaped content to display in the Counterfact™
+     */
+    function _tokenSVG(
         address creator,
         uint256 mintTime,
         bytes32 validationHash,
         address dataContract,
-        string memory content
+        string memory rawContent
     ) internal pure returns (string memory) {
-        content = LibString.escapeHTML(content);
+        // escape content for use in xml
+        string memory escaped = LibString.escapeHTML(rawContent);
+        // pick a color based on the validation hash
         string[7] memory colors =
             ["#e44", "#f71", "#eb0", "#2c5", "#0ae", "#85f", "#777"];
         uint256 colorIndex = uint256(validationHash) % colors.length;
         string memory color = colors[colorIndex];
 
         return string.concat(
-            '<svg xmlns="http://www.w3.org/2000/svg" style="background:#151520" viewBox="0 0 700 300"><path id="a" fill="#151520" d="M20 10h655a10 10 0 0 1 10 10v260a20 10 0 0 1-10 10H20a20 10 0 0 1-10-10V10z"/><text fill="',
+            '<svg xmlns="http://www.w3.org/2000/svg" style="background:#112" viewBox="0 0 700 300"><path id="a" fill="#112" d="M20 10h655a10 10 0 0 1 10 10v260a20 10 0 0 1-10 10H20a20 10 0 0 1-10-10V10z"/><text fill="',
             color,
-            unicode'" dominant-baseline="middle" font-family="Menlo,monospace" font-size="12"><textPath href="#a"><![CDATA[ ',
-            marquee(creator, mintTime, validationHash, dataContract),
+            '" dominant-baseline="middle" font-family="Menlo,monospace" font-size="12"><textPath href="#a"><![CDATA[ ',
+            _generateMarquee(creator, mintTime, validationHash, dataContract),
             ']]></textPath></text><path fill="rgba(0,0,0,0)" stroke="',
             color,
             '" d="M20 20h645a10 10 0 0 1 10 10v240a10 10 0 0 1-10 10H30a10 10 0 0 1-10-10V20z"/><foreignObject x="40" y="15" width="85%" height="85%"><div style="font-family:Menlo,monospace;color:#fff;display:flex;align-items:center;justify-content:left;font-size:0.8em;"  xmlns="http://www.w3.org/1999/xhtml"><p>',
-            content,
+            escaped,
             "</p></div></foreignObject></svg>"
         );
     }
 
-    function marquee(
+    /**
+     * @dev Generate the marquee border text for a Counterfact™
+     */
+    function _generateMarquee(
         address creator,
         uint256 mintTime,
         bytes32 validationHash,
@@ -279,17 +301,23 @@ contract Counterfacts is ERC721 {
         }
     }
 
+    /**
+     * @notice Get the URI for the contract metadata.
+     */
     function contractURI() public pure returns (string memory) {
         return string.concat(
             "data:application/json;",
             string.concat(
                 unicode'{"name":"Counterfacts™","description":"Counterfacts™: the fun, collectible way to prove ',
-                unicode"you're right!",
+                "you're right!",
                 '"}'
             )
         );
     }
 
+    /**
+     * @dev Helper to assert that a token exists.
+     */
     function _assertExists(uint256 tokenId) internal view {
         if (!(_exists(tokenId))) {
             revert TokenDoesNotExist();

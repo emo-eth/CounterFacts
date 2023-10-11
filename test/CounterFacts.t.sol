@@ -42,7 +42,7 @@ contract CounterfactsTest is BaseTest {
         vm.prank(creator);
         uint256 tokenId = counter.mint(validationHash);
         (address _creator, uint256 _timestamp, bytes32 _validation) =
-            counter.tokenMetadata(tokenId);
+            counter.mintMetadata(tokenId);
         assertEq(_creator, creator, "creator != creator");
         assertEq(_timestamp, timestamp, "timestamp != timestamp");
         assertEq(_validation, validationHash, "validation != validationHash");

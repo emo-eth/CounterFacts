@@ -5,10 +5,10 @@ import { Counterfacts } from "../../src/Counterfacts.sol";
 import { SSTORE2 } from "solady/utils/SSTORE2.sol";
 
 contract TestCounterfacts is Counterfacts {
-    function setMetadata(uint256 tokenId, Counterfacts.Metadata memory data)
+    function setMetadata(uint256 tokenId, Counterfacts.MintMetadata memory data)
         public
     {
-        _tokenMetadata[tokenId] = data;
+        _mintMetadata[tokenId] = data;
     }
 
     function setDataContract(uint256 tokenId, address data) public {
@@ -16,7 +16,7 @@ contract TestCounterfacts is Counterfacts {
     }
 
     function getTokenSVG(uint256 tokenId) public view returns (string memory) {
-        Metadata storage metadata = _tokenMetadata[tokenId];
+        MintMetadata storage metadata = _mintMetadata[tokenId];
 
         address dataContract = _dataContractAddresses[tokenId];
 
@@ -25,12 +25,12 @@ contract TestCounterfacts is Counterfacts {
             rawString = string(SSTORE2.read(dataContract));
         }
 
-        return tokenSVG({
+        return _tokenSVG({
             creator: metadata.creator,
             mintTime: metadata.mintTime,
             validationHash: metadata.validationHash,
             dataContract: dataContract,
-            content: rawString
+            rawContent: rawString
         });
     }
 }
